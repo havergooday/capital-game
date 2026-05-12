@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>수도 삼각측량</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', 'Apple SD Gothic Neo', sans-serif;
+      background: #111827;
+      color: #f3f4f6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px 80px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    header h1 { font-size: 1.9rem; font-weight: 700; letter-spacing: -0.5px; }
+    header p { color: #9ca3af; font-size: 0.9rem; margin-top: 6px; }
+    .day-badge {
+      display: inline-block;
+      margin-top: 10px;
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 999px;
+      padding: 3px 14px;
+      font-size: 0.8rem;
+      color: #9ca3af;
+    }
+
+    .game-area { width: 100%; max-width: 560px; }
+
+    /* 입력창 */
+    .input-wrap {
+      position: relative;
+      display: flex;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    #city-input {
+      flex: 1;
+      padding: 13px 16px;
+      background: #1f2937;
+      border: 2px solid #374151;
+      border-radius: 10px;
+      color: #f3f4f6;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    #city-input:focus { border-color: #3b82f6; }
+    #city-input:disabled { opacity: 0.5; }
+
+    #submit-btn {
+      padding: 13px 22px;
+      background: #3b82f6;
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    #submit-btn:hover:not(:disabled) { background: #2563eb; }
+    #submit-btn:disabled { opacity: 0.5; cursor: default; }
+
+    /* 자동완성 */
+    .autocomplete-box {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 80px;
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 10px;
+      overflow: hidden;
+      z-index: 100;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .ac-item {
+      padding: 10px 16px;
+      cursor: pointer;
+      font-size: 0.92rem;
+      display: flex;
+      justify-content: space-between;
+    }
+    .ac-item:hover, .ac-item.active { background: #374151; }
+    .ac-country { color: #6b7280; font-size: 0.82rem; }
+
+    /* 에러 */
+    #error-msg {
+      min-height: 22px;
+      font-size: 0.85rem;
+      color: #f87171;
+      margin-bottom: 10px;
+      padding-left: 4px;
+    }
+
+    /* 통계 바 */
+    .stats-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      padding: 0 2px;
+    }
+    .stats-row span { font-size: 0.82rem; color: #6b7280; }
+
+    /* 추측 목록 */
+    .guess-list { display: flex; flex-direction: column; gap: 7px; }
+
+    .guess-card {
+      background: #1f2937;
+      border-radius: 10px;
+      padding: 12px 16px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 110px;
+      align-items: center;
+      gap: 8px;
+      border-left: 3px solid transparent;
+      animation: slideIn 0.2s ease;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .guess-card.rank-1 { border-left-color: #22c55e; }
+    .guess-card.rank-2 { border-left-color: #84cc16; }
+    .guess-card.rank-3 { border-left-color: #eab308; }
+
+    .gc-city { font-weight: 600; font-size: 0.97rem; }
+    .gc-country { color: #9ca3af; font-size: 0.82rem; }
+    .gc-dist {
+      font-variant-numeric: tabular-nums;
+      font-size: 0.95rem;
+      font-weight: 700;
+      text-align: right;
+    }
+
+    /* 거리 바 */
+    .bar-wrap {
+      grid-column: 1 / -1;
+      background: #374151;
+      border-radius: 999px;
+      height: 5px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.6s ease;
+    }
+
+    /* 승리 패널 */
+    #win-panel {
+      display: none;
+      background: #052e16;
+      border: 1px solid #16a34a;
+      border-radius: 14px;
+      padding: 24px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    #win-panel h2 { color: #4ade80; font-size: 1.4rem; margin-bottom: 6px; }
+    #win-panel p { color: #86efac; font-size: 0.95rem; margin-bottom: 16px; }
+    #share-btn {
+      padding: 10px 24px;
+      background: #16a34a;
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    #share-btn:hover { background: #15803d; }
+    #copy-msg {
+      font-size: 0.8rem;
+      color: #4ade80;
+      margin-top: 8px;
+      min-height: 18px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🌍 수도 삼각측량</h1>
+  <p>오늘의 수도를 맞혀보세요 · 방향 없이 거리만 알려줍니다</p>
+  <div class="day-badge" id="day-badge">#0</div>
+</header>
+
+<div class="game-area">
+
+  <div id="win-panel">
+    <h2 id="win-title">🎉 정답!</h2>
+    <p id="win-desc"></p>
+    <button id="share-btn" onclick="shareResult()">결과 공유 📋</button>
+    <div id="copy-msg"></div>
+  </div>
+
+  <div class="input-wrap" id="input-wrap">
+    <input
+      id="city-input"
+      type="text"
+      placeholder="수도 이름 입력..."
+      autocomplete="off"
+      spellcheck="false"
+    >
+    <button id="submit-btn" onclick="submitGuess()">확인</button>
+    <div class="autocomplete-box" id="ac-box" style="display:none"></div>
+  </div>
+  <div id="error-msg"></div>
+
+  <div class="stats-row">
+    <span id="attempt-count">0회 시도</span>
+    <span>거리 가까운 순</span>
+  </div>
+
+  <div class="guess-list" id="guess-list"></div>
+</div>
+
+<script>
+// ──────────────────────────────────────────
+//  수도 데이터 (이름, 국가, 위도, 경도)
+// ──────────────────────────────────────────
+const CAPITALS = [
+  // 동아시아
+  { n:"서울",       c:"대한민국",              lat:37.5665,  lng:126.9780 },
+  { n:"도쿄",       c:"일본",                  lat:35.6762,  lng:139.6503 },
+  { n:"베이징",     c:"중국",                  lat:39.9042,  lng:116.4074 },
+  { n:"타이베이",   c:"대만",                  lat:25.0330,  lng:121.5654 },
+  { n:"평양",       c:"북한",                  lat:39.0392,  lng:125.7625 },
+  { n:"울란바토르", c:"몽골",                  lat:47.8864,  lng:106.9057 },
+  // 동남아시아
+  { n:"하노이",     c:"베트남",                lat:21.0278,  lng:105.8342 },
+  { n:"마닐라",     c:"필리핀",                lat:14.5995,  lng:120.9842 },
+  { n:"방콕",       c:"태국",                  lat:13.7563,  lng:100.5018 },
+  { n:"자카르타",   c:"인도네시아",            lat:-6.2088,  lng:106.8456 },
+  { n:"쿠알라룸푸르",c:"말레이시아",           lat:3.1390,   lng:101.6869 },
+  { n:"싱가포르",   c:"싱가포르",              lat:1.3521,   lng:103.8198 },
+  { n:"프놈펜",     c:"캄보디아",              lat:11.5564,  lng:104.9282 },
+  { n:"비엔티안",   c:"라오스",                lat:17.9757,  lng:102.6331 },
+  { n:"네피도",     c:"미얀마",                lat:19.7633,  lng:96.0785  },
+  { n:"반다르스리브가완",c:"브루나이",          lat:4.9031,   lng:114.9398 },
+  { n:"딜리",       c:"동티모르",              lat:-8.5569,  lng:125.5789 },
+  // 남아시아
+  { n:"뉴델리",     c:"인도",                  lat:28.6139,  lng:77.2090  },
+  { n:"이슬라마바드",c:"파키스탄",             lat:33.6844,  lng:73.0479  },
+  { n:"다카",       c:"방글라데시",            lat:23.8103,  lng:90.4125  },
+  { n:"카트만두",   c:"네팔",                  lat:27.7172,  lng:85.3240  },
+  { n:"콜롬보",     c:"스리랑카",              lat:6.9271,   lng:79.8612  },
+  { n:"말레",       c:"몰디브",                lat:4.1755,   lng:73.5093  },
+  { n:"카불",       c:"아프가니스탄",          lat:34.5553,  lng:69.2075  },
+  { n:"팀부",       c:"부탄",                  lat:27.4712,  lng:89.6339  },
+  // 중앙아시아
+  { n:"타슈켄트",   c:"우즈베키스탄",          lat:41.2995,  lng:69.2401  },
+  { n:"아스타나",   c:"카자흐스탄",            lat:51.1605,  lng:71.4704  },
+  { n:"비슈케크",   c:"키르기스스탄",          lat:42.8746,  lng:74.5698  },
+  { n:"두샨베",     c:"타지키스탄",            lat:38.5598,  lng:68.7870  },
+  { n:"아시가바트", c:"투르크메니스탄",        lat:37.9601,  lng:58.3261  },
+  // 서아시아
+  { n:"테헤란",     c:"이란",                  lat:35.6892,  lng:51.3890  },
+  { n:"바그다드",   c:"이라크",                lat:33.3152,  lng:44.3661  },
+  { n:"앙카라",     c:"튀르키예",              lat:39.9334,  lng:32.8597  },
+  { n:"리야드",     c:"사우디아라비아",        lat:24.7136,  lng:46.6753  },
+  { n:"아부다비",   c:"아랍에미리트",          lat:24.4539,  lng:54.3773  },
+  { n:"도하",       c:"카타르",                lat:25.2854,  lng:51.5310  },
+  { n:"쿠웨이트시티",c:"쿠웨이트",             lat:29.3759,  lng:47.9774  },
+  { n:"마나마",     c:"바레인",                lat:26.2235,  lng:50.5876  },
+  { n:"무스카트",   c:"오만",                  lat:23.5880,  lng:58.3829  },
+  { n:"사나아",     c:"예멘",                  lat:15.3694,  lng:44.1910  },
+  { n:"예루살렘",   c:"이스라엘",              lat:31.7683,  lng:35.2137  },
+  { n:"암만",       c:"요르단",                lat:31.9454,  lng:35.9284  },
+  { n:"베이루트",   c:"레바논",                lat:33.8886,  lng:35.4955  },
+  { n:"다마스쿠스", c:"시리아",                lat:33.5138,  lng:36.2765  },
+  { n:"니코시아",   c:"키프로스",              lat:35.1856,  lng:33.3823  },
+  // 코카서스
+  { n:"바쿠",       c:"아제르바이잔",          lat:40.4093,  lng:49.8671  },
+  { n:"에레반",     c:"아르메니아",            lat:40.1872,  lng:44.5152  },
+  { n:"트빌리시",   c:"조지아",                lat:41.6938,  lng:44.8015  },
+  // 유럽 서부
+  { n:"런던",       c:"영국",                  lat:51.5074,  lng:-0.1278  },
+  { n:"더블린",     c:"아일랜드",              lat:53.3498,  lng:-6.2603  },
+  { n:"파리",       c:"프랑스",                lat:48.8566,  lng:2.3522   },
+  { n:"마드리드",   c:"스페인",                lat:40.4168,  lng:-3.7038  },
+  { n:"리스본",     c:"포르투갈",              lat:38.7223,  lng:-9.1393  },
+  { n:"안도라라베야",c:"안도라",               lat:42.5063,  lng:1.5218   },
+  { n:"베를린",     c:"독일",                  lat:52.5200,  lng:13.4050  },
+  { n:"암스테르담", c:"네덜란드",              lat:52.3676,  lng:4.9041   },
+  { n:"브뤼셀",     c:"벨기에",               lat:50.8503,  lng:4.3517   },
+  { n:"룩셈부르크", c:"룩셈부르크",           lat:49.6116,  lng:6.1319   },
+  { n:"베른",       c:"스위스",                lat:46.9480,  lng:7.4474   },
+  { n:"빈",         c:"오스트리아",            lat:48.2082,  lng:16.3738  },
+  { n:"로마",       c:"이탈리아",              lat:41.9028,  lng:12.4964  },
+  { n:"바티칸",     c:"바티칸",                lat:41.9029,  lng:12.4534  },
+  { n:"산마리노",   c:"산마리노",              lat:43.9424,  lng:12.4578  },
+  { n:"발레타",     c:"몰타",                  lat:35.8997,  lng:14.5147  },
+  { n:"모나코",     c:"모나코",                lat:43.7384,  lng:7.4246   },
+  { n:"아테네",     c:"그리스",                lat:37.9838,  lng:23.7275  },
+  // 유럽 북부
+  { n:"스톡홀름",   c:"스웨덴",                lat:59.3293,  lng:18.0686  },
+  { n:"오슬로",     c:"노르웨이",              lat:59.9139,  lng:10.7522  },
+  { n:"코펜하겐",   c:"덴마크",                lat:55.6761,  lng:12.5683  },
+  { n:"헬싱키",     c:"핀란드",                lat:60.1699,  lng:24.9384  },
+  { n:"레이캬비크", c:"아이슬란드",            lat:64.1355,  lng:-21.8954 },
+  // 유럽 중동부
+  { n:"바르샤바",   c:"폴란드",                lat:52.2297,  lng:21.0122  },
+  { n:"프라하",     c:"체코",                  lat:50.0755,  lng:14.4378  },
+  { n:"브라티슬라바",c:"슬로바키아",           lat:48.1486,  lng:17.1077  },
+  { n:"부다페스트", c:"헝가리",                lat:47.4979,  lng:19.0402  },
+  { n:"류블랴나",   c:"슬로베니아",            lat:46.0569,  lng:14.5058  },
+  { n:"자그레브",   c:"크로아티아",            lat:45.8150,  lng:15.9819  },
+  { n:"사라예보",   c:"보스니아 헤르체고비나", lat:43.8563,  lng:18.4131  },
+  { n:"포드고리차", c:"몬테네그로",            lat:42.4304,  lng:19.2594  },
+  { n:"티라나",     c:"알바니아",              lat:41.3275,  lng:19.8187  },
+  { n:"스코페",     c:"북마케도니아",          lat:41.9981,  lng:21.4254  },
+  { n:"베오그라드", c:"세르비아",              lat:44.7866,  lng:20.4489  },
+  { n:"부쿠레슈티", c:"루마니아",              lat:44.4268,  lng:26.1025  },
+  { n:"소피아",     c:"불가리아",              lat:42.6977,  lng:23.3219  },
+  { n:"모스크바",   c:"러시아",                lat:55.7558,  lng:37.6173  },
+  { n:"민스크",     c:"벨라루스",              lat:53.9045,  lng:27.5615  },
+  { n:"키이우",     c:"우크라이나",            lat:50.4501,  lng:30.5234  },
+  { n:"키시나우",   c:"몰도바",                lat:47.0105,  lng:28.8638  },
+  { n:"탈린",       c:"에스토니아",            lat:59.4370,  lng:24.7536  },
+  { n:"리가",       c:"라트비아",              lat:56.9460,  lng:24.1059  },
+  { n:"빌뉴스",     c:"리투아니아",            lat:54.6872,  lng:25.2797  },
+  // 아메리카
+  { n:"워싱턴 D.C.",c:"미국",                  lat:38.9072,  lng:-77.0369 },
+  { n:"오타와",     c:"캐나다",                lat:45.4215,  lng:-75.6972 },
+  { n:"멕시코시티", c:"멕시코",                lat:19.4326,  lng:-99.1332 },
+  { n:"과테말라시티",c:"과테말라",             lat:14.6349,  lng:-90.5069 },
+  { n:"벨모판",     c:"벨리즈",                lat:17.2510,  lng:-88.7590 },
+  { n:"테구시갈파", c:"온두라스",              lat:14.0818,  lng:-87.2068 },
+  { n:"산살바도르", c:"엘살바도르",            lat:13.6929,  lng:-89.2182 },
+  { n:"마나과",     c:"니카라과",              lat:12.1149,  lng:-86.2362 },
+  { n:"산호세",     c:"코스타리카",            lat:9.9281,   lng:-84.0907 },
+  { n:"파나마시티", c:"파나마",                lat:8.9936,   lng:-79.5197 },
+  { n:"하바나",     c:"쿠바",                  lat:23.1136,  lng:-82.3666 },
+  { n:"킹스턴",     c:"자메이카",              lat:17.9970,  lng:-76.7936 },
+  { n:"포르토프랭스",c:"아이티",               lat:18.5944,  lng:-72.3074 },
+  { n:"산토도밍고", c:"도미니카 공화국",       lat:18.4861,  lng:-69.9312 },
+  { n:"나소",       c:"바하마",                lat:25.0480,  lng:-77.3554 },
+  { n:"브리지타운", c:"바베이도스",            lat:13.1132,  lng:-59.5988 },
+  { n:"포트오브스페인",c:"트리니다드 토바고",  lat:10.6596,  lng:-61.4789 },
+  { n:"조지타운",   c:"가이아나",              lat:6.8013,   lng:-58.1551 },
+  { n:"파라마리보", c:"수리남",                lat:5.8664,   lng:-55.1668 },
+  { n:"브라질리아", c:"브라질",                lat:-15.7942, lng:-47.8825 },
+  { n:"보고타",     c:"콜롬비아",              lat:4.7110,   lng:-74.0721 },
+  { n:"카라카스",   c:"베네수엘라",            lat:10.4806,  lng:-66.9036 },
+  { n:"키토",       c:"에콰도르",              lat:-0.1807,  lng:-78.4678 },
+  { n:"리마",       c:"페루",                  lat:-12.0464, lng:-77.0428 },
+  { n:"라파스",     c:"볼리비아",              lat:-16.5000, lng:-68.1193 },
+  { n:"아순시온",   c:"파라과이",              lat:-25.2637, lng:-57.5759 },
+  { n:"부에노스아이레스",c:"아르헨티나",       lat:-34.6037, lng:-58.3816 },
+  { n:"몬테비데오", c:"우루과이",              lat:-34.9011, lng:-56.1645 },
+  { n:"산티아고",   c:"칠레",                  lat:-33.4489, lng:-70.6693 },
+  // 아프리카
+  { n:"카이로",     c:"이집트",                lat:30.0444,  lng:31.2357  },
+  { n:"하르툼",     c:"수단",                  lat:15.5007,  lng:32.5599  },
+  { n:"트리폴리",   c:"리비아",                lat:32.8872,  lng:13.1913  },
+  { n:"튀니스",     c:"튀니지",                lat:36.8190,  lng:10.1658  },
+  { n:"알제",       c:"알제리",                lat:36.7372,  lng:3.0865   },
+  { n:"라바트",     c:"모로코",                lat:33.9716,  lng:-6.8498  },
+  { n:"누악쇼트",   c:"모리타니",              lat:18.0735,  lng:-15.9582 },
+  { n:"다카르",     c:"세네갈",                lat:14.7167,  lng:-17.4677 },
+  { n:"바마코",     c:"말리",                  lat:12.6392,  lng:-8.0029  },
+  { n:"와가두구",   c:"부르키나파소",          lat:12.3647,  lng:-1.5353  },
+  { n:"니아메",     c:"니제르",                lat:13.5137,  lng:2.1098   },
+  { n:"아부자",     c:"나이지리아",            lat:9.0765,   lng:7.3986   },
+  { n:"아크라",     c:"가나",                  lat:5.5600,   lng:-0.2057  },
+  { n:"야무수크로", c:"코트디부아르",          lat:6.8276,   lng:-5.2893  },
+  { n:"모노로비아", c:"라이베리아",            lat:6.2907,   lng:-10.7605 },
+  { n:"프리타운",   c:"시에라리온",            lat:8.4657,   lng:-13.2317 },
+  { n:"코나크리",   c:"기니",                  lat:9.6412,   lng:-13.5784 },
+  { n:"비사우",     c:"기니비사우",            lat:11.8816,  lng:-15.6177 },
+  { n:"반줄",       c:"감비아",                lat:13.4549,  lng:-16.5790 },
+  { n:"야운데",     c:"카메룬",                lat:3.8480,   lng:11.5021  },
+  { n:"방기",       c:"중앙아프리카 공화국",   lat:4.3612,   lng:18.5550  },
+  { n:"은자메나",   c:"차드",                  lat:12.1048,  lng:15.0445  },
+  { n:"지부티",     c:"지부티",                lat:11.5720,  lng:43.1456  },
+  { n:"아디스아바바",c:"에티오피아",           lat:9.0320,   lng:38.7469  },
+  { n:"아스마라",   c:"에리트레아",            lat:15.3229,  lng:38.9251  },
+  { n:"모가디슈",   c:"소말리아",              lat:2.0469,   lng:45.3182  },
+  { n:"나이로비",   c:"케냐",                  lat:-1.2921,  lng:36.8219  },
+  { n:"캄팔라",     c:"우간다",                lat:0.3476,   lng:32.5825  },
+  { n:"킨샤사",     c:"콩고 민주공화국",       lat:-4.3317,  lng:15.3314  },
+  { n:"브라자빌",   c:"콩고 공화국",           lat:-4.2661,  lng:15.2832  },
+  { n:"리브르빌",   c:"가봉",                  lat:0.3901,   lng:9.4544   },
+  { n:"도도마",     c:"탄자니아",              lat:-6.1722,  lng:35.7395  },
+  { n:"루사카",     c:"잠비아",                lat:-15.3875, lng:28.3228  },
+  { n:"릴롱궤",     c:"말라위",                lat:-13.9669, lng:33.7873  },
+  { n:"마푸투",     c:"모잠비크",              lat:-25.9686, lng:32.5804  },
+  { n:"하라레",     c:"짐바브웨",              lat:-17.8292, lng:31.0522  },
+  { n:"가보로네",   c:"보츠와나",              lat:-24.6282, lng:25.9231  },
+  { n:"빈트후크",   c:"나미비아",              lat:-22.5609, lng:17.0658  },
+  { n:"루안다",     c:"앙골라",                lat:-8.8368,  lng:13.2343  },
+  { n:"음바바네",   c:"에스와티니",            lat:-26.3054, lng:31.1367  },
+  { n:"마세루",     c:"레소토",                lat:-29.3142, lng:27.4833  },
+  { n:"프리토리아", c:"남아프리카 공화국",     lat:-25.7479, lng:28.2293  },
+  { n:"안타나나리보",c:"마다가스카르",         lat:-18.9137, lng:47.5361  },
+  // 오세아니아
+  { n:"캔버라",     c:"호주",                  lat:-35.2809, lng:149.1300 },
+  { n:"웰링턴",     c:"뉴질랜드",              lat:-41.2865, lng:174.7762 },
+  { n:"수바",       c:"피지",                  lat:-18.1416, lng:178.4419 },
+  { n:"포트모르즈비",c:"파푸아뉴기니",         lat:-9.4438,  lng:147.1803 },
+  { n:"호니아라",   c:"솔로몬 제도",           lat:-9.4333,  lng:160.0333 },
+  { n:"포트빌라",   c:"바누아투",              lat:-17.7333, lng:168.3167 },
+  { n:"누쿠알로파", c:"통가",                  lat:-21.1393, lng:-175.2049},
+  { n:"아피아",     c:"사모아",                lat:-13.8314, lng:-171.7670},
+  { n:"푸나푸티",   c:"투발루",                lat:-8.5211,  lng:179.1983 },
+  { n:"타라와",     c:"키리바시",              lat:1.3291,   lng:172.9790 },
+  { n:"팔리키르",   c:"미크로네시아",          lat:6.9248,   lng:158.1618 },
+  { n:"마주로",     c:"마셜 제도",             lat:7.0897,   lng:171.3803 },
+  { n:"응게룰무드", c:"팔라우",                lat:7.5004,   lng:134.6241 },
+];
+
+// ──────────────────────────────────────────
+//  Haversine 거리 계산 (km)
+// ──────────────────────────────────────────
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) *
+    Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) ** 2;
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+// ──────────────────────────────────────────
+//  오늘의 정답 (날짜 기반)
+// ──────────────────────────────────────────
+function getDailyAnswer() {
+  const d = new Date();
+  const seed = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+  let h = seed ^ (seed >>> 16);
+  h = Math.imul(h, 0x45d9f3b) | 0;
+  h = h ^ (h >>> 16);
+  return CAPITALS[Math.abs(h) % CAPITALS.length];
+}
+
+function getDayNumber() {
+  const origin = new Date(2025, 0, 1);
+  const today  = new Date();
+  return Math.floor((today - origin) / 86400000) + 1;
+}
+
+// ──────────────────────────────────────────
+//  게임 상태
+// ──────────────────────────────────────────
+const ANSWER  = getDailyAnswer();
+let guesses   = [];   // { city, dist }
+let won       = false;
+let acIndex   = -1;   // 자동완성 커서
+
+document.getElementById('day-badge').textContent = '#' + getDayNumber();
+
+// ──────────────────────────────────────────
+//  거리 → 색상
+// ──────────────────────────────────────────
+function distColor(km) {
+  if (km === 0)     return '#4ade80';
+  if (km < 500)     return '#22c55e';
+  if (km < 1500)    return '#84cc16';
+  if (km < 3000)    return '#eab308';
+  if (km < 6000)    return '#f97316';
+  return '#ef4444';
+}
+
+// 막대 너비: 지구 최대 반거리 ~10000km 기준
+function barWidth(km) {
+  return Math.max(2, Math.round((1 - Math.min(km, 10000) / 10000) * 100));
+}
+
+// ──────────────────────────────────────────
+//  화면 렌더링
+// ──────────────────────────────────────────
+function render() {
+  document.getElementById('attempt-count').textContent = `${guesses.length}회 시도`;
+
+  const sorted = [...guesses].sort((a, b) => a.dist - b.dist);
+  const listEl = document.getElementById('guess-list');
+  listEl.innerHTML = '';
+
+  sorted.forEach((g, i) => {
+    const color = distColor(g.dist);
+    const width = barWidth(g.dist);
+    const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
+
+    const card = document.createElement('div');
+    card.className = `guess-card ${rankClass}`;
+    card.innerHTML = `
+      <div>
+        <div class="gc-city">${g.city.n}</div>
+        <div class="gc-country">${g.city.c}</div>
+      </div>
+      <div></div>
+      <div class="gc-dist" style="color:${color}">
+        ${g.dist === 0 ? '🎯 정답!' : g.dist.toLocaleString() + ' km'}
+      </div>
+      <div class="bar-wrap">
+        <div class="bar-fill" style="width:${width}%;background:${color}"></div>
+      </div>
+    `;
+    listEl.appendChild(card);
+  });
+}
+
+// ──────────────────────────────────────────
+//  추측 제출
+// ──────────────────────────────────────────
+function submitGuess() {
+  if (won) return;
+  const input = document.getElementById('city-input');
+  const val   = input.value.trim();
+  if (!val) return;
+
+  closeAC();
+
+  const found = CAPITALS.find(c => c.n === val);
+  if (!found) {
+    showError(`"${val}" 은(는) 목록에 없는 도시입니다`);
+    return;
+  }
+  if (guesses.some(g => g.city.n === found.n)) {
+    showError('이미 시도한 도시입니다');
+    return;
+  }
+
+  showError('');
+  const dist = haversine(found.lat, found.lng, ANSWER.lat, ANSWER.lng);
+  guesses.push({ city: found, dist });
+  input.value = '';
+  render();
+
+  if (dist === 0) {
+    won = true;
+    showWin();
+  }
+}
+
+function showError(msg) {
+  document.getElementById('error-msg').textContent = msg;
+}
+
+function showWin() {
+  const panel = document.getElementById('win-panel');
+  panel.style.display = 'block';
+  document.getElementById('win-title').textContent = `🎉 ${ANSWER.n} (${ANSWER.c})`;
+  document.getElementById('win-desc').textContent =
+    `${guesses.length}번 만에 맞혔습니다!`;
+  document.getElementById('city-input').disabled = true;
+  document.getElementById('submit-btn').disabled = true;
+  panel.scrollIntoView({ behavior: 'smooth' });
+}
+
+// ──────────────────────────────────────────
+//  공유
+// ──────────────────────────────────────────
+function shareResult() {
+  const sorted = [...guesses].sort((a, b) => a.dist - b.dist);
+  const top5   = sorted.slice(0, 5);
+
+  const lines = top5.map(g => {
+    const km = g.dist.toLocaleString();
+    const bar = g.dist === 0 ? '🟢' :
+                g.dist < 1000 ? '🟡' :
+                g.dist < 5000 ? '🟠' : '🔴';
+    return `${bar} ${g.city.n.padEnd(8)} ${km} km`;
+  });
+
+  const text = [
+    `🌍 수도 삼각측량 #${getDayNumber()}`,
+    `✅ ${guesses.length}번 만에 클리어!`,
+    '',
+    ...lines,
+    '',
+    '나도 풀어봐 → capital-game/index.html'
+  ].join('\n');
+
+  navigator.clipboard.writeText(text).then(() => {
+    document.getElementById('copy-msg').textContent = '클립보드에 복사됐습니다!';
+  }).catch(() => {
+    prompt('아래 텍스트를 복사하세요:', text);
+  });
+}
+
+// ──────────────────────────────────────────
+//  자동완성
+// ──────────────────────────────────────────
+const input = document.getElementById('city-input');
+const acBox = document.getElementById('ac-box');
+
+input.addEventListener('input', () => {
+  acIndex = -1;
+  const val = input.value.trim();
+  if (!val) { closeAC(); return; }
+
+  const matches = CAPITALS.filter(c => c.n.startsWith(val)).slice(0, 8);
+  if (!matches.length) { closeAC(); return; }
+
+  acBox.innerHTML = matches.map((c, i) =>
+    `<div class="ac-item" data-name="${c.n}" onclick="selectAC('${c.n}')">
+      <span>${c.n}</span>
+      <span class="ac-country">${c.c}</span>
+    </div>`
+  ).join('');
+  acBox.style.display = 'block';
+});
+
+input.addEventListener('keydown', e => {
+  const items = acBox.querySelectorAll('.ac-item');
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    acIndex = Math.min(acIndex + 1, items.length - 1);
+    items.forEach((el, i) => el.classList.toggle('active', i === acIndex));
+    if (items[acIndex]) input.value = items[acIndex].dataset.name;
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    acIndex = Math.max(acIndex - 1, -1);
+    items.forEach((el, i) => el.classList.toggle('active', i === acIndex));
+    if (acIndex >= 0 && items[acIndex]) input.value = items[acIndex].dataset.name;
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    closeAC();
+    submitGuess();
+  } else if (e.key === 'Escape') {
+    closeAC();
+  }
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.input-wrap')) closeAC();
+});
+
+function selectAC(name) {
+  input.value = name;
+  closeAC();
+  input.focus();
+}
+
+function closeAC() {
+  acBox.style.display = 'none';
+  acBox.innerHTML = '';
+}
+</script>
+</body>
+</html>
