@@ -296,57 +296,6 @@
     }
     .wiki-link:hover { text-decoration: underline; }
 
-    /* ── 홈 스트릭 배지 ── */
-    .mode-streak {
-      margin-top: 10px;
-      font-size: 0.78rem;
-      color: #6b7280;
-      min-height: 18px;
-    }
-    .mode-streak.has-streak { color: #f97316; }
-
-    /* ── 통계 패널 ── */
-    #stats-panel {
-      background: #1f2937;
-      border-radius: 12px;
-      padding: 18px;
-      margin-bottom: 20px;
-    }
-    .stats-header {
-      font-size: 0.75rem;
-      font-weight: 700;
-      color: #6b7280;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-bottom: 14px;
-    }
-    .stats-numbers {
-      display: flex;
-      justify-content: space-around;
-      margin-bottom: 16px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid #374151;
-    }
-    .stat-item { text-align: center; }
-    .stat-value { font-size: 1.8rem; font-weight: 800; }
-    .stat-label { font-size: 0.7rem; color: #6b7280; margin-top: 3px; }
-    .dist-chart { display: flex; flex-direction: column; gap: 5px; }
-    .dist-row { display: flex; align-items: center; gap: 8px; }
-    .dist-label { width: 26px; font-size: 0.78rem; color: #6b7280; text-align: right; flex-shrink: 0; }
-    .dist-bar-wrap { flex: 1; }
-    .dist-bar {
-      background: #374151;
-      border-radius: 3px;
-      padding: 3px 7px;
-      font-size: 0.75rem;
-      color: #6b7280;
-      min-width: 20px;
-      display: inline-block;
-      transition: width 0.5s ease;
-    }
-    .dist-bar.filled  { background: #374151; color: #9ca3af; }
-    .dist-bar.current { background: var(--accent); color: #fff; }
-
     @media (max-width: 480px) {
       .mode-cards { gap: 14px; }
       .mode-card  { width: 100%; max-width: 320px; padding: 28px 22px; }
@@ -365,13 +314,11 @@
       <div class="mode-icon">🏛️</div>
       <div class="mode-name">오늘의 수도</div>
       <div class="mode-desc">세계 195개 수도 중<br>오늘의 정답을 맞혀보세요</div>
-      <div class="mode-streak" id="streak-capital"></div>
     </div>
     <div class="mode-card country" onclick="startGame('country')">
       <div class="mode-icon">🗺️</div>
       <div class="mode-name">오늘의 나라</div>
       <div class="mode-desc">세계 195개 나라 중<br>오늘의 정답을 맞혀보세요</div>
-      <div class="mode-streak" id="streak-country"></div>
     </div>
   </div>
 </div>
@@ -392,7 +339,6 @@
       <div id="copy-msg"></div>
     </div>
     <div id="wiki-card" style="display:none"></div>
-    <div id="stats-panel" style="display:none"></div>
     <div class="input-wrap" id="input-wrap">
       <input id="guess-input" type="text" placeholder="" autocomplete="off" spellcheck="false">
       <button id="submit-btn" onclick="submitGuess()">확인</button>
@@ -898,8 +844,6 @@ function startGame(mode) {
   document.getElementById('copy-msg').textContent      = '';
   document.getElementById('wiki-card').style.display   = 'none';
   document.getElementById('wiki-card').innerHTML        = '';
-  document.getElementById('stats-panel').style.display = 'none';
-  document.getElementById('stats-panel').innerHTML      = '';
   closeAC();
 
   location.hash = mode;
@@ -916,13 +860,11 @@ function goHome() {
   document.getElementById('game').style.display = 'none';
   document.getElementById('home').style.display = 'flex';
   currentMode = null;
-  renderHomeStreaks();
 }
 
 window.addEventListener('load', () => {
   const hash = location.hash.slice(1);
   if (hash in MODES) startGame(hash);
-  else renderHomeStreaks();
 });
 
 window.addEventListener('hashchange', () => {
@@ -1018,8 +960,6 @@ async function showWin() {
   const data = await fetchWiki(ANSWER.n);
   renderWikiCard(data);
 
-  const stats = updateStats(currentMode, guesses.length);
-  renderStats(currentMode, stats, guesses.length);
 }
 
 async function fetchWiki(name) {
@@ -1078,102 +1018,6 @@ function shareResult() {
     document.getElementById('copy-msg').textContent = '클립보드에 복사됐습니다!';
   }).catch(() => {
     prompt('아래 텍스트를 복사하세요:', text);
-  });
-}
-
-// ──────────────────────────────────────────
-//  통계
-// ──────────────────────────────────────────
-function getTodayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-}
-
-function getYesterdayStr() {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-}
-
-function defaultStats() {
-  return { streak: 0, maxStreak: 0, lastWonDate: null, totalWins: 0, distribution: [0,0,0,0,0,0] };
-}
-
-function loadStats(mode) {
-  try { return JSON.parse(localStorage.getItem(`quiz_stats_${mode}`)) || defaultStats(); }
-  catch { return defaultStats(); }
-}
-
-function saveStats(mode, stats) {
-  localStorage.setItem(`quiz_stats_${mode}`, JSON.stringify(stats));
-}
-
-function updateStats(mode, attempts) {
-  const stats = loadStats(mode);
-  const today = getTodayStr();
-  if (stats.lastWonDate === today) return stats;
-
-  stats.totalWins++;
-  stats.distribution[Math.min(attempts - 1, 5)]++;
-  stats.streak = stats.lastWonDate === getYesterdayStr() ? stats.streak + 1 : 1;
-  stats.maxStreak = Math.max(stats.maxStreak, stats.streak);
-  stats.lastWonDate = today;
-  saveStats(mode, stats);
-  return stats;
-}
-
-function renderStats(mode, stats, attempts) {
-  const panel  = document.getElementById('stats-panel');
-  const labels = ['1', '2', '3', '4', '5', '6+'];
-  const maxVal = Math.max(...stats.distribution, 1);
-  const currentIdx = Math.min(attempts - 1, 5);
-
-  const bars = stats.distribution.map((count, i) => {
-    const pct   = Math.round((count / maxVal) * 100);
-    const cls   = i === currentIdx ? 'current' : count > 0 ? 'filled' : '';
-    const width = count > 0 ? Math.max(pct, 8) : 0;
-    return `<div class="dist-row">
-      <span class="dist-label">${labels[i]}</span>
-      <div class="dist-bar-wrap">
-        <div class="dist-bar ${cls}" style="width:${width}%">${count > 0 ? count : ''}</div>
-      </div>
-    </div>`;
-  }).join('');
-
-  panel.innerHTML = `
-    <div class="stats-header">📊 내 통계</div>
-    <div class="stats-numbers">
-      <div class="stat-item">
-        <div class="stat-value">${stats.totalWins}</div>
-        <div class="stat-label">총 클리어</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value">${stats.streak}</div>
-        <div class="stat-label">🔥 현재 스트릭</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value">${stats.maxStreak}</div>
-        <div class="stat-label">최고 스트릭</div>
-      </div>
-    </div>
-    <div class="dist-chart">${bars}</div>`;
-  panel.style.display = 'block';
-}
-
-function renderHomeStreaks() {
-  ['capital', 'country'].forEach(mode => {
-    const el    = document.getElementById(`streak-${mode}`);
-    if (!el) return;
-    const stats = loadStats(mode);
-    if (stats.streak > 0) {
-      el.textContent = `🔥 ${stats.streak}일 연속 클리어`;
-      el.className   = 'mode-streak has-streak';
-    } else if (stats.totalWins > 0) {
-      el.textContent = `총 ${stats.totalWins}번 클리어`;
-      el.className   = 'mode-streak';
-    } else {
-      el.textContent = '';
-    }
   });
 }
 
