@@ -248,6 +248,53 @@
     #win-panel.capital #copy-msg { color: #4ade80; }
     #win-panel.country #copy-msg { color: #a78bfa; }
 
+    #wiki-card {
+      background: #1f2937;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+    .wiki-loading {
+      text-align: center;
+      color: #6b7280;
+      font-size: 0.85rem;
+      padding: 8px 0;
+    }
+    .wiki-body {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+    .wiki-thumb {
+      width: 80px;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+    .wiki-text h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #f3f4f6;
+    }
+    .wiki-desc {
+      font-size: 0.82rem;
+      color: #9ca3af;
+      line-height: 1.65;
+      display: -webkit-box;
+      -webkit-line-clamp: 5;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      margin: 0 0 10px;
+    }
+    .wiki-link {
+      font-size: 0.8rem;
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .wiki-link:hover { text-decoration: underline; }
+
     @media (max-width: 480px) {
       .mode-cards { gap: 14px; }
       .mode-card  { width: 100%; max-width: 320px; padding: 28px 22px; }
@@ -290,6 +337,7 @@
       <button id="share-btn" onclick="shareResult()">결과 공유 📋</button>
       <div id="copy-msg"></div>
     </div>
+    <div id="wiki-card" style="display:none"></div>
     <div class="input-wrap" id="input-wrap">
       <input id="guess-input" type="text" placeholder="" autocomplete="off" spellcheck="false">
       <button id="submit-btn" onclick="submitGuess()">확인</button>
@@ -793,6 +841,8 @@ function startGame(mode) {
   document.getElementById('guess-list').innerHTML      = '';
   document.getElementById('attempt-count').textContent = '0회 시도';
   document.getElementById('copy-msg').textContent      = '';
+  document.getElementById('wiki-card').style.display  = 'none';
+  document.getElementById('wiki-card').innerHTML       = '';
   closeAC();
 
   location.hash = mode;
@@ -893,7 +943,7 @@ function showError(msg) {
   document.getElementById('error-msg').textContent = msg;
 }
 
-function showWin() {
+async function showWin() {
   const panel = document.getElementById('win-panel');
   panel.style.display = 'block';
   const sub = currentMode === 'country' ? ANSWER.r : ANSWER.c;
@@ -902,6 +952,44 @@ function showWin() {
   document.getElementById('guess-input').disabled   = true;
   document.getElementById('submit-btn').disabled   = true;
   panel.scrollIntoView({ behavior: 'smooth' });
+
+  const wikiCard = document.getElementById('wiki-card');
+  wikiCard.style.display = 'block';
+  wikiCard.innerHTML = '<div class="wiki-loading">정보를 불러오는 중...</div>';
+  const data = await fetchWiki(ANSWER.n);
+  renderWikiCard(data);
+}
+
+async function fetchWiki(name) {
+  try {
+    const res = await fetch(
+      `https://ko.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`
+    );
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+function renderWikiCard(data) {
+  const card = document.getElementById('wiki-card');
+  if (!data || data.type === 'disambiguation') {
+    card.style.display = 'none';
+    return;
+  }
+  const thumb = data.thumbnail
+    ? `<img class="wiki-thumb" src="${data.thumbnail.source}" alt="${data.title}">`
+    : '';
+  card.innerHTML = `
+    <div class="wiki-body">
+      ${thumb}
+      <div class="wiki-text">
+        <h3>${data.title}</h3>
+        <p class="wiki-desc">${data.extract || ''}</p>
+        <a class="wiki-link" href="${data.content_urls.desktop.page}" target="_blank" rel="noopener">Wikipedia에서 더 보기 →</a>
+      </div>
+    </div>`;
 }
 
 // ──────────────────────────────────────────
