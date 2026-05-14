@@ -774,13 +774,17 @@ function haversine(lat1, lon1, lat2, lon2) {
   return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
 
-function getDailyAnswer(data, salt) {
+function getDailyAnswer(data, salt, avoidName = null) {
   const d = new Date();
   const seed = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate() + salt;
   let h = seed ^ (seed >>> 16);
   h = Math.imul(h, 0x45d9f3b) | 0;
   h = h ^ (h >>> 16);
-  return data[Math.abs(h) % data.length];
+  let idx = Math.abs(h) % data.length;
+  if (avoidName !== null && data[idx].n === avoidName) {
+    idx = (idx + 1) % data.length;
+  }
+  return data[idx];
 }
 
 function getDayNumber() {
@@ -817,7 +821,10 @@ function startGame(mode) {
   currentMode = mode;
   const cfg = MODES[mode];
 
-  ANSWER  = getDailyAnswer(cfg.data, cfg.salt);
+  const capitalAnswer = getDailyAnswer(MODES.capital.data, MODES.capital.salt);
+  ANSWER = mode === 'country'
+    ? getDailyAnswer(cfg.data, cfg.salt, capitalAnswer.c)
+    : capitalAnswer;
   guesses = [];
   won     = false;
   acIndex = -1;
