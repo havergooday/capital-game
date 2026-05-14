@@ -998,18 +998,11 @@ function renderWikiCard(data) {
 //  공유
 // ──────────────────────────────────────────
 function shareResult() {
-  const sorted = [...guesses].sort((a, b) => a.dist - b.dist);
-  const cfg    = MODES[currentMode];
-  const lines  = sorted.slice(0, 5).map(g => {
-    const bar = g.dist === 0 ? '🟢' : g.dist < 1000 ? '🟡' : g.dist < 5000 ? '🟠' : '🔴';
-    return `${bar} ${g.item.n.padEnd(8)} ${g.dist.toLocaleString()} km`;
-  });
+  const cfg  = MODES[currentMode];
   const url  = `${location.origin}${location.pathname}#${currentMode}`;
   const text = [
     `🌍 ${cfg.shareTitle} #${getDayNumber()}`,
     `✅ ${guesses.length}번 만에 클리어!`,
-    '',
-    ...lines,
     '',
     url,
   ].join('\n');
